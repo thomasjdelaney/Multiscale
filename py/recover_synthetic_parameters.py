@@ -1,9 +1,10 @@
 """
 Recover the parameters used to create the hierarchical data by calculating the multiscale parameters,
 and inference.
+Useful line for editing:
+    execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
 """
 import os
-execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
 import pandas as pd
 import numpy as np
 import anytree as at

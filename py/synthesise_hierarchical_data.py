@@ -1,8 +1,9 @@
 """
 create some synthetic heirarchical data.
+Useful line for editing:
+    execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
 """
 import os
-execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
 import pandas as pd
 import random as rd
 from numpy.random import normal, seed
