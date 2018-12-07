@@ -5,6 +5,7 @@ Useful line for editing:
     execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
 """
 import os
+execfile(os.path.join(os.environ['HOME'], '.pystartup'))
 import pandas as pd
 import numpy as np
 import anytree as at
@@ -104,8 +105,15 @@ country_param_estimated = getEstimatedParamsForPartition(country_measurement_fra
 province_param_estimated = getEstimatedParamsForPartition(province_measurement_frame)
 region_param_estimated = getEstimatedParamsForPartition(region_measurement_frame)
 
+# calculating hierarchical covariances
 province_param_estimated = getPartitionOmegas([country_0, country_1], country_measurement_frame, country_param_estimated, province_measurement_frame, province_param_estimated)
 region_param_estimated = getPartitionOmegas(country_0.children + country_1.children, province_measurement_frame, province_param_estimated, region_measurement_frame, region_param_estimated)
 
+# estimating hierarchical means
 province_param_estimated = getHierarchicalMeanEstimate([country_0, country_1], country_param_estimated, province_param_estimated)
 region_param_estimated = getHierarchicalMeanEstimate(country_0.children + country_1.children, province_param_estimated, region_param_estimated)
+
+# reordering columns
+country_param_estimated = country_param_estimated[country_param_frame.columns]
+province_param_estimated = province_param_estimated[province_param_frame.columns]
+region_param_estimated = region_param_estimated[region_param_frame.columns]
