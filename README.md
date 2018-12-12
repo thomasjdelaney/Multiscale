@@ -13,6 +13,4 @@ Required Packages:
 
 TODO:
 * Move tree building to separate script, save and load using YAML.
-* Calculate mean and variance for posterior
-* Visualise comparison between actual means and hierarchically estimated posterior
-* Visualise comparison between hierarchically estimated means, and actual distributions
+* Move province_to_color to another file.
