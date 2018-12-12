@@ -5,7 +5,6 @@ Useful line for editing:
     execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
 """
 import os
-execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
 import pandas as pd
 import numpy as np
 import anytree as at
@@ -159,3 +158,4 @@ region_param_estimated = region_param_estimated[region_param_frame.columns]
 
 # plotting actual distributions vs estimated means
 region_nodes = province_0.children + province_1.children + province_2.children + province_3.children + province_4.children + province_5.children
+plotRegionalDistnWithEstParam(region_nodes, region_param_frame, region_param_estimated)
