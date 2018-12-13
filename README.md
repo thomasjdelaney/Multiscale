@@ -1,4 +1,4 @@
-Project for fitting a multiscale model as described in Kolaczyk et al 2018.
+Project for fitting a multiscale model as described in Kolaczyk et al 2000.
 
 Python 2.7.15
 Required Packages:
