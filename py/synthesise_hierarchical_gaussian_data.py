@@ -7,14 +7,14 @@ import os
 import pandas as pd
 import random as rd
 from numpy.random import normal, seed
-from numpy import power
+from numpy import power, sqrt
 
 pd.set_option('max_rows', 30)
 rd.seed(1798)
 seed(1798)
 
 proj_dir = os.path.join(os.environ['HOME'], 'Multiscale')
-csv_dir = os.path.join(proj_dir, 'csv')
+csv_dir = os.path.join(proj_dir, 'csv', 'gaussian')
 
 region_param_frame = pd.DataFrame()
 for i in range(24):
@@ -29,13 +29,14 @@ for col in region_param_frame.columns:
     region_measurement_frame[col] = normal(region_param_frame.loc['mean', col], region_param_frame.loc['std', col], 1000)
 
 province_param_frame = pd.DataFrame()
-province_param_frame['province_0'] = [region_param_frame.loc['mean'][0:3].sum()]
-province_param_frame['province_1'] = [region_param_frame.loc['mean'][3:7].sum()]
-province_param_frame['province_2'] = [region_param_frame.loc['mean'][7:12].sum()]
-province_param_frame['province_3'] = [region_param_frame.loc['mean'][12:17].sum()]
-province_param_frame['province_4'] = [region_param_frame.loc['mean'][17:21].sum()]
-province_param_frame['province_5'] = [region_param_frame.loc['mean'][21:24].sum()]
-province_param_frame.index = ['mean']
+province_param_frame['province_0'] = region_param_frame.loc[['mean', 'var']].T[0:3].sum()
+province_param_frame['province_1'] = region_param_frame.loc[['mean', 'var']].T[3:7].sum()
+province_param_frame['province_2'] = region_param_frame.loc[['mean', 'var']].T[7:12].sum()
+province_param_frame['province_3'] = region_param_frame.loc[['mean', 'var']].T[12:17].sum()
+province_param_frame['province_4'] = region_param_frame.loc[['mean', 'var']].T[17:21].sum()
+province_param_frame['province_5'] = region_param_frame.loc[['mean', 'var']].T[21:24].sum()
+province_stds = pd.Series(sqrt(province_param_frame.loc['var']), name='std')
+province_param_frame = province_param_frame.append(province_stds)
 
 province_measurement_frame = pd.DataFrame()
 province_measurement_frame['province_0'] = region_measurement_frame[region_measurement_frame.columns[0:3]].sum(axis=1)

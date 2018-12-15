@@ -12,5 +12,5 @@ Required Packages:
 
 
 TODO:
-* Move tree building to separate script, save and load using YAML.
+* Move tree building to separate script, save and load tree using YAML.
 * Move province_to_color to another file.

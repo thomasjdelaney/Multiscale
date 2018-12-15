@@ -7,16 +7,19 @@ Useful line for editing:
 import os
 import pandas as pd
 import numpy as np
-import anytree as at
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 from scipy.stats import multivariate_normal, norm
 from sklearn.datasets import make_spd_matrix # for generating random covariance matrices
 
 pd.set_option('max_rows', 30)
 # defining directories
 proj_dir = os.path.join(os.environ['HOME'], 'Multiscale')
-csv_dir = os.path.join(proj_dir, 'csv')
+py_dir = os.path.join(proj_dir, 'py')
+csv_dir = os.path.join(proj_dir, 'csv', 'gaussian')
+
+# loading hierarchical tree structure and province colours
+execfile(os.path.join(py_dir, 'tree_and_colours.py'))
+
 # loading measurements
 country_measurement_frame = pd.read_csv(os.path.join(csv_dir, 'country_measurement_frame.csv'), index_col='row_num')
 province_measurement_frame = pd.read_csv(os.path.join(csv_dir, 'province_measurement_frame.csv'), index_col='row_num')
@@ -25,48 +28,6 @@ region_measurement_frame = pd.read_csv(os.path.join(csv_dir, 'region_measurement
 country_param_frame = pd.read_csv(os.path.join(csv_dir, 'country_param_frame.csv'), index_col='parameter')
 province_param_frame = pd.read_csv(os.path.join(csv_dir, 'province_param_frame.csv'), index_col='parameter')
 region_param_frame = pd.read_csv(os.path.join(csv_dir, 'region_param_frame.csv'), index_col='parameter')
-# building trees TODO: move this to a separate script and save down using YAML
-country_0 = at.Node('country_0')
-country_1 = at.Node('country_1')
-province_0 = at.Node('province_0', parent=country_0)
-province_1 = at.Node('province_1', parent=country_0)
-province_2 = at.Node('province_2', parent=country_0)
-province_3 = at.Node('province_3', parent=country_1)
-province_4 = at.Node('province_4', parent=country_1)
-province_5 = at.Node('province_5', parent=country_1)
-region_0 = at.Node('region_0', parent=province_0)
-region_1 = at.Node('region_1', parent=province_0)
-region_2 = at.Node('region_2', parent=province_0)
-region_3 = at.Node('region_3', parent=province_1)
-region_4 = at.Node('region_4', parent=province_1)
-region_5 = at.Node('region_5', parent=province_1)
-region_6 = at.Node('region_6', parent=province_1)
-region_7 = at.Node('region_7', parent=province_2)
-region_8 = at.Node('region_8', parent=province_2)
-region_9 = at.Node('region_9', parent=province_2)
-region_10 = at.Node('region_10', parent=province_2)
-region_11 = at.Node('region_11', parent=province_2)
-region_12 = at.Node('region_12', parent=province_3)
-region_13 = at.Node('region_13', parent=province_3)
-region_14 = at.Node('region_14', parent=province_3)
-region_15 = at.Node('region_15', parent=province_3)
-region_16 = at.Node('region_16', parent=province_3)
-region_17 = at.Node('region_17', parent=province_4)
-region_18 = at.Node('region_18', parent=province_4)
-region_19 = at.Node('region_19', parent=province_4)
-region_20 = at.Node('region_20', parent=province_4)
-region_21 = at.Node('region_21', parent=province_5)
-region_22 = at.Node('region_22', parent=province_5)
-region_23 = at.Node('region_23', parent=province_5)
-
-province_to_color = {}
-colours = cm.gist_rainbow(np.linspace(0, 1, 6))
-province_to_color[province_0] = colours[0]
-province_to_color[province_1] = colours[1]
-province_to_color[province_2] = colours[2]
-province_to_color[province_3] = colours[3]
-province_to_color[province_4] = colours[4]
-province_to_color[province_5] = colours[5]
 
 def getEstimatedParamsForPartition(partition_measurements):
     partition_param_estimated = pd.DataFrame()
@@ -112,7 +73,7 @@ def getHierarchicalMeanEstimate(partition_nodes, node_param_estimated, child_par
     mean_estimates.name = 'hier_mean'
     return child_param_estimated.append(mean_estimates)
 
-def plotRegionalDistnWithEstParam(region_nodes, region_param_frame, region_param_estimated):
+def plotRegionalDistnWithEstParam(region_nodes, param_frame, param_estimated, colour_dict, num_rows=6, num_columns=4):
     num_regions = len(region_nodes)
     real_fig = plt.figure(0)
     post_fig = plt.figure(1)
@@ -127,15 +88,15 @@ def plotRegionalDistnWithEstParam(region_nodes, region_param_frame, region_param
     for i in range(0, num_regions):
         region_node = region_nodes[i]
         region_name = region_node.name
-        region_mean, region_std = region_param_frame[region_name][['mean', 'std']]
-        region_hier_mean, region_post_var = region_param_estimated[region_name][['hier_mean', 'posterior_variance']]
+        region_mean, region_std = param_frame[region_name][['mean', 'std']]
+        region_hier_mean, region_post_var = param_estimated[region_name][['hier_mean', 'posterior_variance']]
         region_post_std = np.sqrt(region_post_var)
         region_distn = norm(region_mean, region_std)
         post_distn = norm(region_hier_mean, region_post_std)
-        plt.figure(0); plt.subplot(6, 4, i+1);
-        plotGaussianWithLine(region_distn, province_to_color[region_node.parent], region_hier_mean, region_name.replace('_', ' '))
-        plt.figure(1); plt.subplot(6, 4, i+1);
-        plotGaussianWithLine(post_distn, province_to_color[region_node.parent], region_mean, region_name.replace('_', ' '))
+        plt.figure(0); plt.subplot(num_rows, num_columns, i+1);
+        plotGaussianWithLine(region_distn, colour_dict[region_node.parent], region_hier_mean, region_name.replace('_', ' '))
+        plt.figure(1); plt.subplot(num_rows, num_columns, i+1);
+        plotGaussianWithLine(post_distn, colour_dict[region_node.parent], region_mean, region_name.replace('_', ' '))
     plt.figure(0); plt.suptitle('True distributions with hierarchically estimated means'); plt.tight_layout();
     plt.figure(1); plt.suptitle('Posterior distributions with true means'); plt.tight_layout();
 
@@ -158,4 +119,5 @@ region_param_estimated = region_param_estimated[region_param_frame.columns]
 
 # plotting actual distributions vs estimated means
 region_nodes = province_0.children + province_1.children + province_2.children + province_3.children + province_4.children + province_5.children
-plotRegionalDistnWithEstParam(region_nodes, region_param_frame, region_param_estimated)
+# plotRegionalDistnWithEstParam(region_nodes, region_param_frame, region_param_estimated, province_to_colour)
+# plotRegionalDistnWithEstParam(country_0.children + country_1.children, province_param_frame, province_param_estimated, country_to_colour, num_rows=3, num_columns=2)
