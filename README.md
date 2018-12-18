@@ -1,7 +1,8 @@
 Project for fitting a multiscale model as described in Kolaczyk et al 2000.
 
 Python 2.7.15
-Required Packages:
+
+###### Required Packages:
 
 1. pandas 0.23.4
 2. random
@@ -10,7 +11,13 @@ Required Packages:
 5. scipy 1.1.0
 6. sklearn 0.20.0
 
+#### Recovering parameters via hierarchical model
+
+In order to recover the means of the finest level measurements for either the Gaussian or Poisson hierarchical model, run:
+* python -i py/recover_synthetic_gaussian_parameters.py
+* python -i py/recover_synthetic_poisson_parameters.py
+The true parameters can be found in the 'region_param_frame' pandas dataframe, the estimated parameters can be found in the  'region_param_estimated' pandas dataframe.
 
 TODO:
-* Move tree building to separate script, save and load tree using YAML.
-* Move province_to_color to another file.
+* Save and load tree using YAML.
+* Visually compare hierarchical means with actual means for poisson version
