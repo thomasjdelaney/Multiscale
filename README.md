@@ -21,3 +21,7 @@ The true parameters can be found in the 'region_param_frame' pandas dataframe, t
 TODO:
 * Save and load tree using YAML.
 * Visually compare hierarchical means with actual means for poisson version
+* use scaled identity matrix as prior variance
+* scatter true and estimated means
+* calculate marginal likelihood of more than one hierarchy of partitions
+* using a very sharp prior doesn't seem to make any difference, find out why

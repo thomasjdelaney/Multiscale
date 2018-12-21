@@ -5,11 +5,19 @@ Useful line for editing:
     execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
 """
 import os
+execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
+import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal, norm
 from sklearn.datasets import make_spd_matrix # for generating random covariance matrices
+
+# command line arguments
+parser = argparse.ArgumentParser(description='Recover the parameters used to create the hierarchical data by calculating the multiscale parameters, and inference.')
+parser.add_argument('-i', '--use_identity_matrix', help='Use scaled identity matrix as the prior covariance matrix.', action='store_true', default=False)
+parser.add_argument('-s', '--identity_scaling_value', help='The value to scale the identity matrix.', type=float, default=1.0)
+args = parser.parse_args()
 
 pd.set_option('max_rows', 30)
 # defining directories
@@ -39,6 +47,13 @@ def getEstimatedParamsForPartition(partition_measurements):
     partition_param_estimated = partition_param_estimated.append(partition_var_estimated)
     return partition_param_estimated
 
+def getPriorCovarianceMatrix(use_identity, num_children, identity_scale):
+    if use_identity:
+        prior_covariance = identity_scale * np.identity(num_children)
+    else:
+        prior_covariance = make_spd_matrix(num_children, random_state=1)/100
+    return prior_covariance
+
 def getNodeExpectedOmega(node, node_measure_frame, node_param_estimated, child_measure_frame, child_param_estimated):
     n = child_measure_frame.shape[0] # num samples
     num_children = len(node.children)
@@ -46,7 +61,7 @@ def getNodeExpectedOmega(node, node_measure_frame, node_param_estimated, child_m
     node_var = node_param_estimated.loc['var'][node.name]
     child_vars = child_param_estimated.loc['var'][child_names]
     node_nu = child_vars/node_var
-    node_phi = make_spd_matrix(num_children, random_state=1)/100 # prior variance matrix
+    node_phi = getPriorCovarianceMatrix(args.use_identity_matrix, num_children, args.identity_scaling_value)
     node_Omega = np.diag(child_vars) - np.outer(child_vars, child_vars)/node_var
     post_covariance = np.linalg.inv(np.linalg.inv(node_phi) + n*np.linalg.inv(node_Omega))
     measurement_factor = child_measure_frame[child_names].mean() - node_measure_frame[node.name].mean()*node_nu
@@ -119,5 +134,5 @@ region_param_estimated = region_param_estimated[region_param_frame.columns]
 
 # plotting actual distributions vs estimated means
 region_nodes = province_0.children + province_1.children + province_2.children + province_3.children + province_4.children + province_5.children
-# plotRegionalDistnWithEstParam(region_nodes, region_param_frame, region_param_estimated, province_to_colour)
+plotRegionalDistnWithEstParam(region_nodes, region_param_frame, region_param_estimated, province_to_colour)
 # plotRegionalDistnWithEstParam(country_0.children + country_1.children, province_param_frame, province_param_estimated, country_to_colour, num_rows=3, num_columns=2)
