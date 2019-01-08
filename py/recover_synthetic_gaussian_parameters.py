@@ -115,6 +115,19 @@ def plotRegionalDistnWithEstParam(region_nodes, param_frame, param_estimated, co
     plt.figure(0); plt.suptitle('True distributions with hierarchically estimated means'); plt.tight_layout();
     plt.figure(1); plt.suptitle('Posterior distributions with true means'); plt.tight_layout();
 
+def plotTrueMeansVsEstimatedMeans(parent_nodes, colour_dict, child_param_frame, child_param_estimated, title=''):
+    fig = plt.figure()
+    for parent_node in parent_nodes:
+        child_names = [cn.name for cn in parent_node.children]
+        colour = colour_dict[parent_node]
+        plt.scatter(child_param_frame.loc['mean'][child_names], child_param_estimated.loc['hier_mean'][child_names], color=colour, label=parent_node.name)
+    plt.xlabel('True mean', fontsize='large'); plt.ylabel('Estimated mean', fontsize='large')
+    upper_x_lim, upper_y_lim = np.ceil(plt.xlim()[1]), np.ceil(plt.ylim()[1])
+    plt.plot([0,upper_x_lim], [0,upper_y_lim], color='black', linestyle='--', alpha=0.3)
+    plt.xlim(0,upper_x_lim); plt.ylim(0,upper_y_lim)
+    plt.legend(); plt.title(title, fontsize='large')
+    plt.tight_layout()
+
 country_param_estimated = getEstimatedParamsForPartition(country_measurement_frame)
 province_param_estimated = getEstimatedParamsForPartition(province_measurement_frame)
 region_param_estimated = getEstimatedParamsForPartition(region_measurement_frame)
