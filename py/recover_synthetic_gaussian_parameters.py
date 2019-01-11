@@ -2,11 +2,11 @@
 Recover the parameters used to create the hierarchical data by calculating the multiscale parameters,
 and inference.
 Useful line for editing:
-    execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
+    execfile(os.path.join(os.environ['HOME'], '.pystartup'))
 """
 import os
-execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
-import argparse
+execfile(os.path.join(os.environ['HOME'], '.pystartup'))
+import sys, argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ from sklearn.datasets import make_spd_matrix # for generating random covariance 
 
 # command line arguments
 parser = argparse.ArgumentParser(description='Recover the parameters used to create the hierarchical data by calculating the multiscale parameters, and inference.')
-parser.add_argument('-i', '--use_identity_matrix', help='Use scaled identity matrix as the prior covariance matrix.', action='store_true', default=False)
+parser.add_argument('-i', '--use_random_matrix', help='Use scaled random matrix as the prior covariance matrix.', action='store_true', default=False)
 parser.add_argument('-s', '--identity_scaling_value', help='The value to scale the identity matrix.', type=float, default=1.0)
 args = parser.parse_args()
 
@@ -27,6 +27,10 @@ csv_dir = os.path.join(proj_dir, 'csv', 'gaussian')
 
 # loading hierarchical tree structure and province colours
 execfile(os.path.join(py_dir, 'tree_and_colours.py'))
+
+# loading shared plotting functions
+sys.path.append(py_dir)
+import plottingMultiscale as pm
 
 # loading measurements
 country_measurement_frame = pd.read_csv(os.path.join(csv_dir, 'country_measurement_frame.csv'), index_col='row_num')
@@ -47,11 +51,18 @@ def getEstimatedParamsForPartition(partition_measurements):
     partition_param_estimated = partition_param_estimated.append(partition_var_estimated)
     return partition_param_estimated
 
-def getPriorCovarianceMatrix(use_identity, num_children, identity_scale):
-    if use_identity:
-        prior_covariance = identity_scale * np.identity(num_children)
+def getMeanComparisonPlotSuptitle(identity_scale, use_random_matrix):
+    if use_random_matrix:
+        suptitle = 'Random prior covariance'
     else:
+        suptitle = 'Prior covariance = ' + str(identity_scale) + '*I'
+    return suptitle
+
+def getPriorCovarianceMatrix(use_random_matrix, num_children, identity_scale):
+    if use_random_matrix:
         prior_covariance = make_spd_matrix(num_children, random_state=1)/100
+    else:
+        prior_covariance = identity_scale * np.identity(num_children)
     return prior_covariance
 
 def getNodeExpectedOmega(node, node_measure_frame, node_param_estimated, child_measure_frame, child_param_estimated):
@@ -61,7 +72,7 @@ def getNodeExpectedOmega(node, node_measure_frame, node_param_estimated, child_m
     node_var = node_param_estimated.loc['var'][node.name]
     child_vars = child_param_estimated.loc['var'][child_names]
     node_nu = child_vars/node_var
-    node_phi = getPriorCovarianceMatrix(args.use_identity_matrix, num_children, args.identity_scaling_value)
+    node_phi = getPriorCovarianceMatrix(args.use_random_matrix, num_children, args.identity_scaling_value)
     node_Omega = np.diag(child_vars) - np.outer(child_vars, child_vars)/node_var
     post_covariance = np.linalg.inv(np.linalg.inv(node_phi) + n*np.linalg.inv(node_Omega))
     measurement_factor = child_measure_frame[child_names].mean() - node_measure_frame[node.name].mean()*node_nu
@@ -92,14 +103,12 @@ def plotRegionalDistnWithEstParam(region_nodes, param_frame, param_estimated, co
     num_regions = len(region_nodes)
     real_fig = plt.figure(0)
     post_fig = plt.figure(1)
-
     def plotGaussianWithLine(gaussian, colour, line_x, plot_title):
         x_axis = np.linspace(gaussian.mean() - 3*gaussian.std(), gaussian.mean() + 3*gaussian.std(), 1000)
         plt.plot(x_axis, gaussian.pdf(x_axis), color=colour)
         plt.vlines(line_x, ymin=0, ymax=plt.ylim()[1], alpha=0.3, linestyles='dashed')
         plt.title(plot_title, fontsize='small')
         plt.xticks(fontsize='small'); plt.yticks([]);
-
     for i in range(0, num_regions):
         region_node = region_nodes[i]
         region_name = region_node.name
@@ -115,22 +124,14 @@ def plotRegionalDistnWithEstParam(region_nodes, param_frame, param_estimated, co
     plt.figure(0); plt.suptitle('True distributions with hierarchically estimated means'); plt.tight_layout();
     plt.figure(1); plt.suptitle('Posterior distributions with true means'); plt.tight_layout();
 
-def plotTrueMeansVsEstimatedMeans(parent_nodes, colour_dict, child_param_frame, child_param_estimated, title=''):
-    fig = plt.figure()
-    for parent_node in parent_nodes:
-        child_names = [cn.name for cn in parent_node.children]
-        colour = colour_dict[parent_node]
-        plt.scatter(child_param_frame.loc['mean'][child_names], child_param_estimated.loc['hier_mean'][child_names], color=colour, label=parent_node.name)
-    plt.xlabel('True mean', fontsize='large'); plt.ylabel('Estimated mean', fontsize='large')
-    upper_x_lim, upper_y_lim = np.ceil(plt.xlim()[1]), np.ceil(plt.ylim()[1])
-    plt.plot([0,upper_x_lim], [0,upper_y_lim], color='black', linestyle='--', alpha=0.3)
-    plt.xlim(0,upper_x_lim); plt.ylim(0,upper_y_lim)
-    plt.legend(); plt.title(title, fontsize='large')
-    plt.tight_layout()
-
 country_param_estimated = getEstimatedParamsForPartition(country_measurement_frame)
 province_param_estimated = getEstimatedParamsForPartition(province_measurement_frame)
 region_param_estimated = getEstimatedParamsForPartition(region_measurement_frame)
+
+# reordering columns
+country_param_estimated = country_param_estimated[country_param_frame.columns]
+province_param_estimated = province_param_estimated[province_param_frame.columns]
+region_param_estimated = region_param_estimated[region_param_frame.columns]
 
 # calculating hierarchical covariances
 province_param_estimated = getPartitionOmegas([country_0, country_1], country_measurement_frame, country_param_estimated, province_measurement_frame, province_param_estimated)
@@ -140,12 +141,6 @@ region_param_estimated = getPartitionOmegas(country_0.children + country_1.child
 province_param_estimated = getHierarchicalMeanEstimate([country_0, country_1], country_param_estimated, province_param_estimated)
 region_param_estimated = getHierarchicalMeanEstimate(country_0.children + country_1.children, province_param_estimated, region_param_estimated)
 
-# reordering columns
-country_param_estimated = country_param_estimated[country_param_frame.columns]
-province_param_estimated = province_param_estimated[province_param_frame.columns]
-region_param_estimated = region_param_estimated[region_param_frame.columns]
-
-# plotting actual distributions vs estimated means
-region_nodes = province_0.children + province_1.children + province_2.children + province_3.children + province_4.children + province_5.children
-plotRegionalDistnWithEstParam(region_nodes, region_param_frame, region_param_estimated, province_to_colour)
-# plotRegionalDistnWithEstParam(country_0.children + country_1.children, province_param_frame, province_param_estimated, country_to_colour, num_rows=3, num_columns=2)
+pm.plotSampleAccuracyAndEstimatedAccuracy(country_0.children + country_1.children, province_to_colour, region_param_frame, region_param_estimated, getMeanComparisonPlotSuptitle(args.identity_scaling_value, args.use_random_matrix))
+mad = np.abs(region_param_estimated.loc['mean'] - region_param_estimated.loc['hier_mean']).mean()
+print('Mean absolute difference between sample means and hierarchically estimated means: ' + str(mad))
