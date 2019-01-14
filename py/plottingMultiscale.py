@@ -8,7 +8,6 @@ def plotSampleAccuracyAndEstimatedAccuracy(parent_nodes, colour_dict, child_para
     plt.legend(fontsize='large')
     plt.subplot(122)
     plotTrueMeansVsEstimatedMeans(parent_nodes, colour_dict, child_param_frame, child_param_estimated, estimated_name='hier_mean', ylabel='Hierarchically estimated mean')
-    plt.tight_layout()
     plt.suptitle(suptitle)
 
 def plotTrueMeansVsEstimatedMeans(parent_nodes, colour_dict, child_param_frame, child_param_estimated, param_name='mean', estimated_name='hier_mean', title='', ylabel='Estimated mean'):
