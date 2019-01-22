@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def plotSampleAccuracyAndEstimatedAccuracy(parent_nodes, colour_dict, child_param_frame, child_param_estimated, suptitle=''):
-    fig = plt.figure()
+    fig = plt.figure(figsize=(8.0,4.25))
     plt.subplot(121)
     plotTrueMeansVsEstimatedMeans(parent_nodes, colour_dict, child_param_frame, child_param_estimated, estimated_name='mean', ylabel='Sample mean')
     plt.legend(fontsize='large')

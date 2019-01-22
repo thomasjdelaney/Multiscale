@@ -1,5 +1,5 @@
 """
-create some synthetic heirarchical data.
+create some synthetic heirarchical data. All regions are independent.
 Useful line for editing:
     execfile(os.path.join(os.environ['HOME'], '.pythonrc'))
 """
