@@ -52,19 +52,6 @@ def loadMeasurementsAndTruth(csv_dir, prefix):
     region_param_frame = pd.read_csv(os.path.join(csv_dir, prefix + 'region_param_frame.csv'), index_col='parameter')
     return country_measurement_frame, province_measurement_frame, region_measurement_frame, country_param_frame, province_param_frame, region_param_frame
 
-def getEstimatedParamsForPartition(partition_measurements):
-    partition_param_estimated = pd.DataFrame()
-    partition_mean_estimated = partition_measurements.mean()
-    partition_mean_estimated.name = 'mean'
-    partition_var_estimated = partition_measurements.var()
-    partition_var_estimated.name = 'var'
-    partition_std_estimated = partition_measurements.std()
-    partition_std_estimated.name = 'std'
-    partition_param_estimated = partition_param_estimated.append(partition_mean_estimated)
-    partition_param_estimated = partition_param_estimated.append(partition_var_estimated)
-    partition_param_estimated = partition_param_estimated.append(partition_std_estimated)
-    return partition_param_estimated
-
 def getMeanComparisonPlotSuptitleAndFilename(identity_scale, use_random_matrix, mean_squared_difference=0.0):
     if use_random_matrix:
         suptitle = 'Random prior covariance'
@@ -83,9 +70,12 @@ def getPriorCovarianceMatrix(use_random_matrix, num_children, identity_scale):
         prior_covariance = identity_scale * np.identity(num_children)
     return prior_covariance
 
+def getChildrenForParameterEstimation(node):
+    return node.children[:-1]
+
 def getNodeOmega(node, node_param_estimated, child_param_estimated):
     node_var = node_param_estimated.loc['var'][node.name]
-    child_names = [c.name for c in node.children]
+    child_names = [c.name for c in getChildrenForParameterEstimation(node)]
     child_vars = child_param_estimated.loc['var'][child_names]
     node_nu = child_vars/node_var
     node_Omega = np.diag(child_vars) - np.outer(child_vars, child_vars)/node_var
@@ -93,7 +83,7 @@ def getNodeOmega(node, node_param_estimated, child_param_estimated):
 
 def getNodeExpectedOmega(node, node_measure_frame, node_param_estimated, child_measure_frame, child_param_estimated):
     n = child_measure_frame.shape[0] # num samples
-    num_children = len(node.children)
+    num_children = len(getChildrenForParameterEstimation(node))
     node_phi = getPriorCovarianceMatrix(args.use_random_matrix, num_children, args.identity_scaling_value)
     child_names, node_nu, node_Omega = getNodeOmega(node, node_param_estimated, child_param_estimated)
     post_covariance = np.linalg.inv(np.linalg.inv(node_phi) + n*np.linalg.inv(node_Omega))
@@ -101,25 +91,49 @@ def getNodeExpectedOmega(node, node_measure_frame, node_param_estimated, child_m
     omega_hat = n * np.matmul(post_covariance, np.matmul(np.linalg.inv(node_Omega), measurement_factor))
     return omega_hat, node_nu.values, np.diag(post_covariance)
 
-def getPartitionOmegas(partition_nodes, partition_measure_frame, partition_param_estimated, child_measure_frame, child_param_estimated):
-    child_node_names = child_param_estimated.columns
-    child_omega_nu = [getNodeExpectedOmega(node, partition_measure_frame, partition_param_estimated, child_measure_frame, child_param_estimated) for node in partition_nodes]
-    child_omega_estimated, child_nu, child_post_variance = np.concatenate(child_omega_nu, axis=1)
-    child_param_estimated = child_param_estimated.append(pd.Series(child_omega_estimated, index=child_node_names, name='omega'))
-    child_param_estimated = child_param_estimated.append(pd.Series(child_nu, index=child_node_names, name='nu'))
-    return child_param_estimated.append(pd.Series(child_post_variance, index=child_node_names, name='posterior_variance'))
-
 def getHierarchicalMeanEstimatebyNode(node, node_param_estimated, child_param_estimated):
-    child_names = [c.name for c in node.children]
+    child_names = [c.name for c in getChildrenForParameterEstimation(node)]
     node_mean = node_param_estimated.loc['mean'][node.name]
     child_nu = child_param_estimated.loc['nu'][child_names]
     child_omega = child_param_estimated.loc['omega'][child_names]
     return child_omega + node_mean*child_nu
 
-def getHierarchicalMeanEstimate(partition_nodes, node_param_estimated, child_param_estimated):
-    mean_estimates = pd.concat(getHierarchicalMeanEstimatebyNode(node, node_param_estimated, child_param_estimated) for node in partition_nodes)
-    mean_estimates.name = 'hier_mean'
-    return child_param_estimated.append(mean_estimates)
+def estimateEasyParams(estimated_parameter_frame, measure_frame):
+    estimated_parameter_frame.loc['mean'] = measure_frame.mean()
+    estimated_parameter_frame.loc['var'] = measure_frame.var()
+    estimated_parameter_frame.loc['std'] = measure_frame.std()
+    return estimated_parameter_frame
+
+def getEstimatedParameterFrames(country_nodes, country_measurement_frame, province_measurement_frame, region_measurement_frame):
+    parameters_to_estimate = ['mean', 'var', 'std', 'omega', 'nu', 'posterior_variance', 'hier_mean']
+    country_param_estimated = pd.DataFrame(columns = country_measurement_frame.columns, index=parameters_to_estimate[0:3], dtype=float)
+    country_param_estimated = estimateEasyParams(country_param_estimated, country_measurement_frame)
+    country_param_estimated.loc['hier_mean'] = country_param_estimated.loc['mean']
+    province_param_estimated = pd.DataFrame(columns = province_measurement_frame.columns, index=parameters_to_estimate, dtype=float)
+    province_param_estimated = estimateEasyParams(province_param_estimated, province_measurement_frame)
+    region_param_estimated = pd.DataFrame(columns = region_measurement_frame.columns, index=parameters_to_estimate, dtype=float)
+    region_param_estimated = estimateEasyParams(region_param_estimated, region_measurement_frame)
+    depth_to_measure_frame = {0:country_measurement_frame, 1:province_measurement_frame, 2:region_measurement_frame}
+    depth_to_estimated_frame = {0:country_param_estimated, 1:province_param_estimated, 2:region_param_estimated}
+    for top_level_node in country_nodes:
+        node_and_family = (top_level_node,) + top_level_node.descendants
+        for node in node_and_family:
+            depth_to_estimated_frame = estimateHierarchicalParamsParentNode(node, depth_to_measure_frame, depth_to_estimated_frame)
+    return depth_to_estimated_frame[0], depth_to_estimated_frame[1], depth_to_estimated_frame[2],
+
+def estimateHierarchicalParamsParentNode(node, depth_to_measure_frame, depth_to_estimated_frame):
+    if not(node.is_leaf):
+        child_names = [c.name for c in getChildrenForParameterEstimation(node)]
+        omega_hat, nu, post_variance = getNodeExpectedOmega(node, depth_to_measure_frame[node.depth], depth_to_estimated_frame[node.depth], depth_to_measure_frame[node.depth+1], depth_to_estimated_frame[node.depth+1])
+        depth_to_estimated_frame[node.depth+1].loc['omega'][child_names] = omega_hat
+        depth_to_estimated_frame[node.depth+1].loc['nu'][child_names] = nu
+        depth_to_estimated_frame[node.depth+1].loc['posterior_variance'][child_names] = post_variance
+        hier_mean = getHierarchicalMeanEstimatebyNode(node, depth_to_estimated_frame[node.depth], depth_to_estimated_frame[node.depth+1])
+        depth_to_estimated_frame[node.depth+1].loc['hier_mean'][child_names] = hier_mean
+        excluded_child_name = node.children[-1].name
+        node_hier_mean = depth_to_estimated_frame[node.depth].loc['hier_mean'][node.name]
+        depth_to_estimated_frame[node.depth+1].loc['hier_mean'][excluded_child_name] = node_hier_mean - hier_mean.sum()
+    return depth_to_estimated_frame
 
 def sampleFromModel(province_nodes, province_param_estimated, region_param_estimated, num_samples=1000):
     model_measurement_frame = pd.DataFrame(np.zeros([num_samples, region_param_estimated.shape[1]]), columns=region_param_estimated.columns)
@@ -156,20 +170,9 @@ def plotRegionalDistnWithEstParam(region_nodes, param_frame, param_estimated, co
 
 country_measurement_frame, province_measurement_frame, region_measurement_frame, country_param_frame, province_param_frame, region_param_frame = loadMeasurementsAndTruth(csv_dir, args.csv_file_prefix)
 
-# getting sample means and variances
-country_param_estimated = getEstimatedParamsForPartition(country_measurement_frame)
-province_param_estimated = getEstimatedParamsForPartition(province_measurement_frame)
-region_param_estimated = getEstimatedParamsForPartition(region_measurement_frame)
-# reordering columns
-country_param_estimated = country_param_estimated[country_param_frame.columns]
-province_param_estimated = province_param_estimated[province_param_frame.columns]
-region_param_estimated = region_param_estimated[region_param_frame.columns]
-# calculating hierarchical covariances
-province_param_estimated = getPartitionOmegas([country_0, country_1], country_measurement_frame, country_param_estimated, province_measurement_frame, province_param_estimated)
-region_param_estimated = getPartitionOmegas(country_0.children + country_1.children, province_measurement_frame, province_param_estimated, region_measurement_frame, region_param_estimated)
-# estimating hierarchical means
-province_param_estimated = getHierarchicalMeanEstimate([country_0, country_1], country_param_estimated, province_param_estimated)
-region_param_estimated = getHierarchicalMeanEstimate(country_0.children + country_1.children, province_param_estimated, region_param_estimated)
+# estimating the hierarchical parameters
+country_nodes = [country_0, country_1]
+country_param_estimated, province_param_estimated, region_param_estimated = getEstimatedParameterFrames(country_nodes, country_measurement_frame, province_measurement_frame, region_measurement_frame)
 
 # plotting and measuring mean squared difference between estimated and sampled means
 msd = np.power(region_param_estimated.loc['mean'] - region_param_estimated.loc['hier_mean'], 2).mean()
