@@ -16,6 +16,7 @@ from sklearn.datasets import make_spd_matrix # for generating random covariance 
 parser = argparse.ArgumentParser(description='Create random continuous data with some covariance between region measurements.')
 parser.add_argument('-t', '--covariance_type', help='The type of covariance to use.', default='intraprovincial', choices=['intraprovincial', 'random', 'extraprovincial'])
 parser.add_argument('-s', '--save_prefix', help='The prefix to use when saving csv files.', default='corr_')
+parser.add_argument('-r', '--random_states', help='The random states to use when making covariance matrices.', nargs=2, type=int, default=[1798, 1916])
 parser.add_argument('-d', '--debug', help='Flag to enter debug mode.', action='store_true', default=False)
 args = parser.parse_args()
 
@@ -29,12 +30,12 @@ def getRegionalMeans():
     return [rd.uniform(2,15) for i in range(0,24)]
 
 def getIntraprovinceCorrelationCovarianceMatrix():
-    covariance_0 = make_spd_matrix(3, random_state=1798)
-    covariance_1 = make_spd_matrix(4, random_state=1798)
-    covariance_2 = make_spd_matrix(5, random_state=1798)
-    covariance_3 = make_spd_matrix(5, random_state=1916)
-    covariance_4 = make_spd_matrix(4, random_state=1916)
-    covariance_5 = make_spd_matrix(3, random_state=1916)
+    covariance_0 = make_spd_matrix(3, random_state=args.random_states[0])
+    covariance_1 = make_spd_matrix(4, random_state=args.random_states[0])
+    covariance_2 = make_spd_matrix(5, random_state=args.random_states[0])
+    covariance_3 = make_spd_matrix(5, random_state=args.random_states[1])
+    covariance_4 = make_spd_matrix(4, random_state=args.random_states[1])
+    covariance_5 = make_spd_matrix(3, random_state=args.random_states[1])
     intraprovince_correlation_covariance = np.block([[covariance_0, np.zeros([3,21])],
             [np.zeros([4,3]), covariance_1, np.zeros([4,17])],
             [np.zeros([5,7]), covariance_2, np.zeros([5,12])],
@@ -44,7 +45,7 @@ def getIntraprovinceCorrelationCovarianceMatrix():
     return intraprovince_correlation_covariance
 
 def getRandomCovarianceMatrix():
-    return make_spd_matrix(24, random_state=1798)
+    return make_spd_matrix(24, random_state=args.random_states[0])
 
 def getRegionParamFrame(regional_means, covariance_matrix):
     region_param_frame = pd.DataFrame()

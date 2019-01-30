@@ -22,6 +22,9 @@ parser.add_argument('-i', '--use_random_matrix', help='Use scaled random matrix 
 parser.add_argument('-s', '--identity_scaling_value', help='The value to scale the identity matrix.', type=float, default=1.0)
 parser.add_argument('-p', '--plot_mean_accuracy', help='Flag to make the mean accuracy plot.', action='store_true', default=False)
 parser.add_argument('-a', '--save_mean_accuracy', help='Flag to save the scaling value and mean squared accuracy.', action='store_true', default=False)
+parser.add_argument('-b', '--save_accuracy_plot', help='Flag to save the mean accuracy plot.', action='store_true')
+parser.add_argument('-e', '--plot_correlation', help='Flag to make the correlation mean_comparison plot.', action='store_true')
+parser.add_argument('-c', '--correlation_plot_filename', help='Where to save the correlation plot. If not entered, plot will not be saved.', type=str, default='')
 parser.add_argument('-f', '--csv_file_prefix', help='Prefix to attach to csv file names.', type=str, default='')
 parser.add_argument('-d', '--debug', help='Flag to enter debug mode.', action='store_true', default=False)
 args = parser.parse_args()
@@ -51,17 +54,6 @@ def loadMeasurementsAndTruth(csv_dir, prefix):
     province_param_frame = pd.read_csv(os.path.join(csv_dir, prefix + 'province_param_frame.csv'), index_col='parameter')
     region_param_frame = pd.read_csv(os.path.join(csv_dir, prefix + 'region_param_frame.csv'), index_col='parameter')
     return country_measurement_frame, province_measurement_frame, region_measurement_frame, country_param_frame, province_param_frame, region_param_frame
-
-def getMeanComparisonPlotSuptitleAndFilename(identity_scale, use_random_matrix, mean_squared_difference=0.0):
-    if use_random_matrix:
-        suptitle = 'Random prior covariance'
-        filename = 'mean_comparisons_random_covariance.png'
-    else:
-        suptitle = 'Prior covariance = ' + str(identity_scale) + '*I'
-        filename = 'mean_comparisons_'+ str(identity_scale) + '_covariance.png'
-    if mean_squared_difference > 0.0:
-        suptitle = suptitle + ', Mean squared difference = ' + '%.2E' % Decimal(mean_squared_difference)
-    return suptitle, filename
 
 def getPriorCovarianceMatrix(use_random_matrix, num_children, identity_scale):
     if use_random_matrix:
@@ -183,19 +175,34 @@ def plotRegionalDistnWithEstParam(region_nodes, param_frame, param_estimated, co
     plt.figure(0); plt.suptitle('True distributions with hierarchically estimated means'); plt.tight_layout();
     plt.figure(1); plt.suptitle('Posterior distributions with true means'); plt.tight_layout();
 
-def plotAccuracyAndSave(scaling_value, is_random, msd, parent_nodes, colour_dict, child_param_frame, child_param_estimated, image_dir=image_dir):
+def getMeanComparisonPlotSuptitleAndFilename(identity_scale, use_random_matrix, mean_squared_difference=0.0):
+    if use_random_matrix:
+        suptitle = 'Random prior covariance'
+        filename = 'mean_comparisons_random_covariance.png'
+    else:
+        suptitle = 'Prior covariance = ' + str(identity_scale) + '*I'
+        filename = 'mean_comparisons_'+ str(identity_scale) + '_covariance.png'
+    if mean_squared_difference > 0.0:
+        suptitle = suptitle + ', Mean squared difference = ' + '%.2E' % Decimal(mean_squared_difference)
+    return suptitle, filename
+
+def plotAccuracyAndSave(scaling_value, is_random, msd, parent_nodes, colour_dict, child_param_frame, child_param_estimated, image_dir=image_dir, is_save=True):
     plot_suptitle, plot_filename = getMeanComparisonPlotSuptitleAndFilename(scaling_value, is_random, msd)
+    save_name = os.path.join(image_dir, 'mean_comparisons', plot_filename)
     pm.plotSampleAccuracyAndEstimatedAccuracy(parent_nodes, colour_dict, child_param_frame, child_param_estimated, plot_suptitle)
-    plt.savefig(os.path.join(image_dir, 'mean_comparisons', plot_filename))
-    plt.close()
+    if is_save:
+        plt.savefig(save_name)
+        plt.close()
+    else:
+        plt.show(block=False)
+    return save_name
 
 def saveMeanAccuracyToCsv(scaling_value, mean_squared_difference, results_csv_dir=results_csv_dir):
     with open(os.path.join(results_csv_dir, 'scaling_accuracy.csv'), 'a') as f:
         writer = csv.writer(f)
         writer.writerow([args.identity_scaling_value, msd])
 
-def plotHierarchyCovariance(ax, k, corr_matrix, min_corr, max_corr, title):
-	np.fill_diagonal(corr_matrix, 0.0) # setting main diagonal to zero
+def plotPartitionCorrelation(ax, k, corr_matrix, min_corr, max_corr, title):
 	cax = ax.matshow(corr_matrix, vmin=min_corr, vmax=max_corr)
 	plt.xticks(fontsize='large');plt.yticks(fontsize='large');
 	if k==0:
@@ -203,22 +210,29 @@ def plotHierarchyCovariance(ax, k, corr_matrix, min_corr, max_corr, title):
 		ax.set_xticks([])
 	return cax
 
-def plotHierarchyPairwiseCovariance(depth_to_measure_frame, depth_to_model_measurement):
-	fig = plt.figure()
-	num_partitions = len(depth_to_measure_frame)
-	for k in depth_to_measure_frame.keys():
-		data_corr = depth_to_measure_frame[k].corr().values
-		model_corr = depth_to_model_measurement[k].corr().values
-		min_corr = np.min([data_corr.min(), model_corr.min()])
-		max_corr = np.max([data_corr.max(), model_corr.max()])
-		ax = plt.subplot(num_partitions, 2, 2*k+1)
-		plotHierarchyCovariance(ax, k, data_corr, min_corr, max_corr, 'Data correlation')
-		ax = plt.subplot(num_partitions, 2, 2*k+2)
-		im = plotHierarchyCovariance(ax, k, model_corr, min_corr, max_corr, 'Model correlation')
-		fig.subplots_adjust(right=0.8)
-		cbar_ax = fig.add_axes([0.85, ax.get_position().y0, 0.05, ax.get_position().y1])
-		fig.colorbar(cax=cbar_ax)
-	plt.tight_layout()
+def plotHierarchyPairwiseCorrelation(depth_to_measure_frame, depth_to_model_measurement, image_dir=image_dir, file_name=''):
+    fig = plt.figure(figsize=(5.75, 8.25))
+    num_partitions = len(depth_to_measure_frame)
+    for k in depth_to_measure_frame.keys():
+        data_corr = depth_to_measure_frame[k].corr().values
+        model_corr = depth_to_model_measurement[k].corr().values
+        np.fill_diagonal(data_corr, 0.0); np.fill_diagonal(model_corr, 0.0);
+        min_corr = np.min([data_corr.min(), model_corr.min()])
+        max_corr = np.max([data_corr.max(), model_corr.max()])
+        ax = plt.subplot(num_partitions, 2, 2*k+1)
+        plotPartitionCorrelation(ax, k, data_corr, min_corr, max_corr, 'Data correlation')
+        ax = plt.subplot(num_partitions, 2, 2*k+2)
+        im = plotPartitionCorrelation(ax, k, model_corr, min_corr, max_corr, 'Model correlation')
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, ax.get_position().y0, 0.05, ax.get_position().y1 - ax.get_position().y0])
+        fig.colorbar(im, cax=cbar_ax)
+    if file_name != '':
+        save_name = os.path.join(image_dir, 'covariance_comparisons', file_name)
+        plt.savefig(save_name)
+    else:
+        save_name = ''
+        plt.show(block=False)
+    return save_name
 
 print(dt.datetime.now().isoformat() + ' INFO: ' + 'Loading measurements...')
 country_measurement_frame, province_measurement_frame, region_measurement_frame, country_param_frame, province_param_frame, region_param_frame = loadMeasurementsAndTruth(csv_dir, args.csv_file_prefix)
@@ -231,10 +245,15 @@ msd = np.power(region_param_estimated.loc['mean'] - region_param_estimated.loc['
 print(dt.datetime.now().isoformat() + ' INFO: ' + 'Mean squared difference between sample means and hierarchically estimated means: ' + str(msd))
 if args.plot_mean_accuracy:
     print(dt.datetime.now().isoformat() + ' INFO: ' + 'Plotting sample and estimation accuracy...')
-    plotAccuracyAndSave(args.identity_scaling_value, args.use_random_matrix, msd, country_0.children + country_1.children, province_to_colour, region_param_frame, region_param_estimated)
+    plot_filename = plotAccuracyAndSave(args.identity_scaling_value, args.use_random_matrix, msd, country_0.children + country_1.children, province_to_colour, region_param_frame, region_param_estimated, is_save=args.save_accuracy_plot)
+    if args.save_accuracy_plot:
+        print(dt.datetime.now().isoformat() + ' INFO: ' + 'Plot saved: ' + plot_filename)
 if args.save_mean_accuracy:
     print(dt.datetime.now().isoformat() + ' INFO: ' + 'Saving mean estimation accuracy...')
     saveMeanAccuracyToCsv(args.identity_scaling_value, msd)
 print(dt.datetime.now().isoformat() + ' INFO: ' + 'Sampling from model and plotting pairwise correlations...')
 depth_to_model_measurement = sampleFromModel([country_0, country_1], depth_to_estimated_frame)
-plotHierarchyPairwiseCovariance(depth_to_measure_frame, depth_to_model_measurement)
+if args.plot_correlation:
+    plot_filename = plotHierarchyPairwiseCorrelation(depth_to_measure_frame, depth_to_model_measurement, file_name=args.correlation_plot_filename)
+    if plot_filename != '':
+        print(dt.datetime.now().isoformat() + ' INFO: ' + 'Plot saved: ' + plot_filename)
