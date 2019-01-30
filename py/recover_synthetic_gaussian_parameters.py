@@ -104,44 +104,59 @@ def estimateEasyParams(estimated_parameter_frame, measure_frame):
     estimated_parameter_frame.loc['std'] = measure_frame.std()
     return estimated_parameter_frame
 
-def getEstimatedParameterFrames(country_nodes, country_measurement_frame, province_measurement_frame, region_measurement_frame):
-    parameters_to_estimate = ['mean', 'var', 'std', 'omega', 'nu', 'posterior_variance', 'hier_mean']
-    country_param_estimated = pd.DataFrame(columns = country_measurement_frame.columns, index=parameters_to_estimate[0:3], dtype=float)
-    country_param_estimated = estimateEasyParams(country_param_estimated, country_measurement_frame)
-    country_param_estimated.loc['hier_mean'] = country_param_estimated.loc['mean']
-    province_param_estimated = pd.DataFrame(columns = province_measurement_frame.columns, index=parameters_to_estimate, dtype=float)
-    province_param_estimated = estimateEasyParams(province_param_estimated, province_measurement_frame)
-    region_param_estimated = pd.DataFrame(columns = region_measurement_frame.columns, index=parameters_to_estimate, dtype=float)
-    region_param_estimated = estimateEasyParams(region_param_estimated, region_measurement_frame)
-    depth_to_measure_frame = {0:country_measurement_frame, 1:province_measurement_frame, 2:region_measurement_frame}
-    depth_to_estimated_frame = {0:country_param_estimated, 1:province_param_estimated, 2:region_param_estimated}
-    for top_level_node in country_nodes:
-        node_and_family = (top_level_node,) + top_level_node.descendants
-        for node in node_and_family:
-            depth_to_estimated_frame = estimateHierarchicalParamsParentNode(node, depth_to_measure_frame, depth_to_estimated_frame)
-    return depth_to_estimated_frame[0], depth_to_estimated_frame[1], depth_to_estimated_frame[2],
-
-def estimateHierarchicalParamsParentNode(node, depth_to_measure_frame, depth_to_estimated_frame):
-    if not(node.is_leaf):
-        child_names = [c.name for c in getChildrenForParameterEstimation(node)]
-        omega_hat, nu, post_variance = getNodeExpectedOmega(node, depth_to_measure_frame[node.depth], depth_to_estimated_frame[node.depth], depth_to_measure_frame[node.depth+1], depth_to_estimated_frame[node.depth+1])
-        depth_to_estimated_frame[node.depth+1].loc['omega'][child_names] = omega_hat
-        depth_to_estimated_frame[node.depth+1].loc['nu'][child_names] = nu
-        depth_to_estimated_frame[node.depth+1].loc['posterior_variance'][child_names] = post_variance
-        hier_mean = getHierarchicalMeanEstimatebyNode(node, depth_to_estimated_frame[node.depth], depth_to_estimated_frame[node.depth+1])
-        depth_to_estimated_frame[node.depth+1].loc['hier_mean'][child_names] = hier_mean
-        excluded_child_name = node.children[-1].name
-        node_hier_mean = depth_to_estimated_frame[node.depth].loc['hier_mean'][node.name]
-        depth_to_estimated_frame[node.depth+1].loc['hier_mean'][excluded_child_name] = node_hier_mean - hier_mean.sum()
+def estimateHierarchicalParamsFromParentNode(node, depth_to_measure_frame, depth_to_estimated_frame):
+    child_names = [c.name for c in getChildrenForParameterEstimation(node)]
+    omega_hat, nu, post_variance = getNodeExpectedOmega(node, depth_to_measure_frame[node.depth], depth_to_estimated_frame[node.depth], depth_to_measure_frame[node.depth+1], depth_to_estimated_frame[node.depth+1])
+    depth_to_estimated_frame[node.depth+1].loc['omega'][child_names] = omega_hat
+    depth_to_estimated_frame[node.depth+1].loc['nu'][child_names] = nu
+    depth_to_estimated_frame[node.depth+1].loc['posterior_variance'][child_names] = post_variance
+    hier_mean = getHierarchicalMeanEstimatebyNode(node, depth_to_estimated_frame[node.depth], depth_to_estimated_frame[node.depth+1])
+    depth_to_estimated_frame[node.depth+1].loc['hier_mean'][child_names] = hier_mean
+    excluded_child_name = node.children[-1].name
+    node_hier_mean = depth_to_estimated_frame[node.depth].loc['hier_mean'][node.name]
+    depth_to_estimated_frame[node.depth+1].loc['hier_mean'][excluded_child_name] = node_hier_mean - hier_mean.sum()
     return depth_to_estimated_frame
 
-def sampleFromModel(province_nodes, province_param_estimated, region_param_estimated, num_samples=1000):
-    model_measurement_frame = pd.DataFrame(np.zeros([num_samples, region_param_estimated.shape[1]]), columns=region_param_estimated.columns)
-    for province_node in province_nodes:
-        region_names, province_nu, Omega = getNodeOmega(province_node, province_param_estimated, region_param_estimated)
-        child_samples = multivariate_normal(region_param_estimated[region_names].loc['hier_mean'], Omega, num_samples)
-        model_measurement_frame[region_names] = child_samples
-    return model_measurement_frame
+def getEstimatedParameterFrames(country_nodes, depth_to_measure_frame):
+    parameters_to_estimate = ['mean', 'var', 'std', 'omega', 'nu', 'posterior_variance', 'hier_mean']
+    country_param_estimated = pd.DataFrame(columns = country_measurement_frame.columns, index=parameters_to_estimate[0:3], dtype=float)
+    country_param_estimated = estimateEasyParams(country_param_estimated, depth_to_measure_frame[0])
+    country_param_estimated.loc['hier_mean'] = country_param_estimated.loc['mean']
+    province_param_estimated = pd.DataFrame(columns = province_measurement_frame.columns, index=parameters_to_estimate, dtype=float)
+    province_param_estimated = estimateEasyParams(province_param_estimated, depth_to_measure_frame[1])
+    region_param_estimated = pd.DataFrame(columns = region_measurement_frame.columns, index=parameters_to_estimate, dtype=float)
+    region_param_estimated = estimateEasyParams(region_param_estimated, depth_to_measure_frame[2])
+    depth_to_estimated_frame = {0:country_param_estimated, 1:province_param_estimated, 2:region_param_estimated}
+    for top_level_node in country_nodes:
+        node_and_family = (top_level_node,) + top_level_node.children
+        for node in node_and_family:
+            depth_to_estimated_frame = estimateHierarchicalParamsFromParentNode(node, depth_to_measure_frame, depth_to_estimated_frame)
+    return depth_to_estimated_frame
+
+def sampleFromModelByNode(node, depth_to_model_measurement, depth_to_estimated_frame):
+    child_names, node_nu, node_Omega = getNodeOmega(node, depth_to_estimated_frame[node.depth], depth_to_estimated_frame[node.depth+1])
+    node_nu = np.array(node_nu)
+    node_measures = np.array(depth_to_model_measurement[node.depth][node.name])
+    child_omegas = np.array(depth_to_estimated_frame[node.depth+1].loc['omega'][child_names])
+    means_for_sampling = np.array([node_nu*y + child_omegas for y in node_measures])
+    samples = np.array([multivariate_normal(m, node_Omega)for m in means_for_sampling])
+    depth_to_model_measurement[node.depth+1][child_names] = samples
+    excluded_child_name = node.children[-1].name
+    depth_to_model_measurement[node.depth+1][excluded_child_name] = node_measures - samples.sum(axis=1)
+    return depth_to_model_measurement
+
+def sampleFromModel(country_nodes, depth_to_estimated_frame, num_samples=1000):
+    depth_to_model_measurement = {}
+    for k, estimated_parameter_frame in depth_to_estimated_frame.iteritems():
+        depth_to_model_measurement[k] = pd.DataFrame(columns=estimated_parameter_frame.columns, dtype=float, index=range(num_samples))
+    top_level_Omega = np.diag(depth_to_estimated_frame[0].loc['var'])
+    top_level_samples = multivariate_normal(depth_to_estimated_frame[0].loc['hier_mean'], top_level_Omega, num_samples)
+    depth_to_model_measurement[0][[node.name for node in country_nodes]] = top_level_samples
+    for top_level_node in country_nodes:
+        node_and_family = (top_level_node,) + top_level_node.children
+        for node in node_and_family:
+            depth_to_model_measurement = sampleFromModelByNode(node, depth_to_model_measurement, depth_to_estimated_frame)
+    return depth_to_model_measurement
 
 def plotRegionalDistnWithEstParam(region_nodes, param_frame, param_estimated, colour_dict, num_rows=6, num_columns=4):
     num_regions = len(region_nodes)
@@ -168,29 +183,54 @@ def plotRegionalDistnWithEstParam(region_nodes, param_frame, param_estimated, co
     plt.figure(0); plt.suptitle('True distributions with hierarchically estimated means'); plt.tight_layout();
     plt.figure(1); plt.suptitle('Posterior distributions with true means'); plt.tight_layout();
 
-country_measurement_frame, province_measurement_frame, region_measurement_frame, country_param_frame, province_param_frame, region_param_frame = loadMeasurementsAndTruth(csv_dir, args.csv_file_prefix)
-
-# estimating the hierarchical parameters
-country_nodes = [country_0, country_1]
-country_param_estimated, province_param_estimated, region_param_estimated = getEstimatedParameterFrames(country_nodes, country_measurement_frame, province_measurement_frame, region_measurement_frame)
-
-# plotting and measuring mean squared difference between estimated and sampled means
-msd = np.power(region_param_estimated.loc['mean'] - region_param_estimated.loc['hier_mean'], 2).mean()
-if args.plot_mean_accuracy:
-    plot_suptitle, plot_filename = getMeanComparisonPlotSuptitleAndFilename(args.identity_scaling_value, args.use_random_matrix, msd)
-    pm.plotSampleAccuracyAndEstimatedAccuracy(country_0.children + country_1.children, province_to_colour, region_param_frame, region_param_estimated, plot_suptitle)
+def plotAccuracyAndSave(scaling_value, is_random, msd, parent_nodes, colour_dict, child_param_frame, child_param_estimated, image_dir=image_dir):
+    plot_suptitle, plot_filename = getMeanComparisonPlotSuptitleAndFilename(scaling_value, is_random, msd)
+    pm.plotSampleAccuracyAndEstimatedAccuracy(parent_nodes, colour_dict, child_param_frame, child_param_estimated, plot_suptitle)
     plt.savefig(os.path.join(image_dir, 'mean_comparisons', plot_filename))
-print(dt.datetime.now().isoformat() + ' INFO: ' + 'Mean squared difference between sample means and hierarchically estimated means: ' + str(msd))
-if args.save_mean_accuracy:
+    plt.close()
+
+def saveMeanAccuracyToCsv(scaling_value, mean_squared_difference, results_csv_dir=results_csv_dir):
     with open(os.path.join(results_csv_dir, 'scaling_accuracy.csv'), 'a') as f:
         writer = csv.writer(f)
         writer.writerow([args.identity_scaling_value, msd])
 
-# sampling from model and printing pairwise correlations
-model_measurement_frame = sampleFromModel(country_0.children + country_1.children, province_param_estimated, region_param_estimated)
-plt.figure()
-ax = plt.subplot(121)
-ax.matshow(region_measurement_frame.corr())
-ax = plt.subplot(122)
-ax.matshow(model_measurement_frame.corr())
-plt.tight_layout()
+def plotHierarchyPairwiseCovariance(depth_to_measure_frame, depth_to_model_measurement):
+    fig = plt.figure()
+    def plotHierarchyCovariance(k, cov_matrix, min_cov, max_cov, title):
+        cax = ax.matshow(cov_matrix, vmin=min_cov, vmax=max_cov)
+        plt.xticks(fontsize='large');plt.yticks(fontsize='large');
+        if k==0:
+            plt.title(title)
+            ax.set_xticks([])
+        return cax
+    num_partitions = len(depth_to_measure_frame)
+    for k in depth_to_measure_frame.keys():
+        data_cov = depth_to_measure_frame[k].cov()
+        model_cov = depth_to_model_measurement[k].cov()
+        min_cov = np.min([data_cov.values.min(), model_cov.values.min()])
+        max_cov = np.max([data_cov.values.max(), model_cov.values.max()])
+        ax = plt.subplot(num_partitions, 2, 2*k+1)
+        plotHierarchyCovariance(k, data_cov, min_cov, max_cov, 'Data covariance')
+        ax = plt.subplot(num_partitions, 2, 2*k+2)
+        cax = plotHierarchyCovariance(k, model_cov, min_cov, max_cov, 'Model covariance')
+        fig.colorbar(cax)
+    plt.tight_layout()
+
+print(dt.datetime.now().isoformat() + ' INFO: ' + 'Loading measurements...')
+country_measurement_frame, province_measurement_frame, region_measurement_frame, country_param_frame, province_param_frame, region_param_frame = loadMeasurementsAndTruth(csv_dir, args.csv_file_prefix)
+depth_to_measure_frame = {0:country_measurement_frame, 1:province_measurement_frame, 2:region_measurement_frame}
+print(dt.datetime.now().isoformat() + ' INFO: ' + 'Estimating hierarchical parameters...')
+depth_to_estimated_frame = getEstimatedParameterFrames([country_0, country_1], depth_to_measure_frame)
+country_param_estimated, province_param_estimated, region_param_estimated = [depth_to_estimated_frame[i]for i in depth_to_estimated_frame.keys()]
+print(dt.datetime.now().isoformat() + ' INFO: ' + 'Measuring mean squared differences...')
+msd = np.power(region_param_estimated.loc['mean'] - region_param_estimated.loc['hier_mean'], 2).mean()
+print(dt.datetime.now().isoformat() + ' INFO: ' + 'Mean squared difference between sample means and hierarchically estimated means: ' + str(msd))
+if args.plot_mean_accuracy:
+    print(dt.datetime.now().isoformat() + ' INFO: ' + 'Plotting sample and estimation accuracy...')
+    plotAccuracyAndSave(args.identity_scaling_value, args.use_random_matrix, msd, country_0.children + country_1.children, province_to_colour, region_param_frame, region_param_estimated)
+if args.save_mean_accuracy:
+    print(dt.datetime.now().isoformat() + ' INFO: ' + 'Saving mean estimation accuracy...')
+    saveMeanAccuracyToCsv(args.identity_scaling_value, msd)
+print(dt.datetime.now().isoformat() + ' INFO: ' + 'Sampling from model and plotting pairwise correlations...')
+depth_to_model_measurement = sampleFromModel([country_0, country_1], depth_to_estimated_frame)
+plotHierarchyPairwiseCovariance(depth_to_measure_frame, depth_to_model_measurement)

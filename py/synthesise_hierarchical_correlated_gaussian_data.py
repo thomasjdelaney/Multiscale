@@ -5,11 +5,19 @@ Useful line for editing:
 """
 import os
 execfile(os.path.join(os.environ['HOME'], '.pystartup'))
+import argparse
 import pandas as pd
 import random as rd
 import numpy as np
+import datetime as dt
 from numpy.random import multivariate_normal, seed
 from sklearn.datasets import make_spd_matrix # for generating random covariance matrices
+
+parser = argparse.ArgumentParser(description='Create random continuous data with some covariance between region measurements.')
+parser.add_argument('-t', '--covariance_type', help='The type of covariance to use.', default='intraprovincial', choices=['intraprovincial', 'random', 'extraprovincial'])
+parser.add_argument('-s', '--save_prefix', help='The prefix to use when saving csv files.', default='corr_')
+parser.add_argument('-d', '--debug', help='Flag to enter debug mode.', action='store_true', default=False)
+args = parser.parse_args()
 
 rd.seed(1798)
 seed(1798)
@@ -35,6 +43,9 @@ def getIntraprovinceCorrelationCovarianceMatrix():
             [np.zeros([3,21]), covariance_5]])
     return intraprovince_correlation_covariance
 
+def getRandomCovarianceMatrix():
+    return make_spd_matrix(24, random_state=1798)
+
 def getRegionParamFrame(regional_means, covariance_matrix):
     region_param_frame = pd.DataFrame()
     for i in range(0,24):
@@ -46,7 +57,15 @@ def getRegionParamFrame(regional_means, covariance_matrix):
     return region_param_frame
 
 regional_means = getRegionalMeans()
-covariance_matrix = getIntraprovinceCorrelationCovarianceMatrix()
+if args.covariance_type == 'intraprovincial':
+    covariance_matrix = getIntraprovinceCorrelationCovarianceMatrix()
+elif args.covariance_type == 'random':
+    covariance_matrix = getRandomCovarianceMatrix()
+elif args.covariance_type == 'extraprovincial':
+    covariance_matrix = getRandomCovarianceMatrix() # TODO
+else:
+    print(dt.datetime.now().isoformat() + ' ERROR: ' + 'covariance type not recognised!')
+    covariance_matrix = getRandomCovarianceMatrix()
 
 region_param_frame = getRegionParamFrame(regional_means, covariance_matrix)
 samples = multivariate_normal(regional_means, covariance_matrix, 1000)
@@ -79,9 +98,9 @@ country_measurement_frame = pd.DataFrame()
 country_measurement_frame['country_0'] = province_measurement_frame[province_param_frame.columns[0:3]].sum(axis=1)
 country_measurement_frame['country_1'] = province_measurement_frame[province_param_frame.columns[3:6]].sum(axis=1)
 
-region_param_frame.to_csv(os.path.join(csv_dir, 'corr_region_param_frame.csv'), index_label='parameter')
-province_param_frame.to_csv(os.path.join(csv_dir, 'corr_province_param_frame.csv'), index_label='parameter')
-country_param_frame.to_csv(os.path.join(csv_dir, 'corr_country_param_frame.csv'), index_label='parameter')
-region_measurement_frame.to_csv(os.path.join(csv_dir, 'corr_region_measurement_frame.csv'), index_label='row_num')
-province_measurement_frame.to_csv(os.path.join(csv_dir, 'corr_province_measurement_frame.csv'), index_label='row_num')
-country_measurement_frame.to_csv(os.path.join(csv_dir, 'corr_country_measurement_frame.csv'), index_label='row_num')
+region_param_frame.to_csv(os.path.join(csv_dir, args.save_prefix + 'region_param_frame.csv'), index_label='parameter')
+province_param_frame.to_csv(os.path.join(csv_dir, args.save_prefix + 'province_param_frame.csv'), index_label='parameter')
+country_param_frame.to_csv(os.path.join(csv_dir, args.save_prefix + 'country_param_frame.csv'), index_label='parameter')
+region_measurement_frame.to_csv(os.path.join(csv_dir, args.save_prefix + 'region_measurement_frame.csv'), index_label='row_num')
+province_measurement_frame.to_csv(os.path.join(csv_dir, args.save_prefix + 'province_measurement_frame.csv'), index_label='row_num')
+country_measurement_frame.to_csv(os.path.join(csv_dir, args.save_prefix + 'country_measurement_frame.csv'), index_label='row_num')
