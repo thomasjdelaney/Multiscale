@@ -26,7 +26,7 @@ parser.add_argument('-f', '--csv_file_prefix', help='Prefix to attach to csv fil
 parser.add_argument('-d', '--debug', help='Flag to enter debug mode.', action='store_true', default=False)
 args = parser.parse_args()
 
-pd.set_option('max_rows', 30)
+pd.set_option('max_rows', 30); pd.set_option('max_columns', 0);
 # defining directories
 proj_dir = os.path.join(os.environ['HOME'], 'Multiscale')
 py_dir = os.path.join(proj_dir, 'py')
@@ -194,27 +194,31 @@ def saveMeanAccuracyToCsv(scaling_value, mean_squared_difference, results_csv_di
         writer = csv.writer(f)
         writer.writerow([args.identity_scaling_value, msd])
 
+def plotHierarchyCovariance(ax, k, corr_matrix, min_corr, max_corr, title):
+	np.fill_diagonal(corr_matrix, 0.0) # setting main diagonal to zero
+	cax = ax.matshow(corr_matrix, vmin=min_corr, vmax=max_corr)
+	plt.xticks(fontsize='large');plt.yticks(fontsize='large');
+	if k==0:
+		plt.title(title)
+		ax.set_xticks([])
+	return cax
+
 def plotHierarchyPairwiseCovariance(depth_to_measure_frame, depth_to_model_measurement):
-    fig = plt.figure()
-    def plotHierarchyCovariance(k, cov_matrix, min_cov, max_cov, title):
-        cax = ax.matshow(cov_matrix, vmin=min_cov, vmax=max_cov)
-        plt.xticks(fontsize='large');plt.yticks(fontsize='large');
-        if k==0:
-            plt.title(title)
-            ax.set_xticks([])
-        return cax
-    num_partitions = len(depth_to_measure_frame)
-    for k in depth_to_measure_frame.keys():
-        data_cov = depth_to_measure_frame[k].cov()
-        model_cov = depth_to_model_measurement[k].cov()
-        min_cov = np.min([data_cov.values.min(), model_cov.values.min()])
-        max_cov = np.max([data_cov.values.max(), model_cov.values.max()])
-        ax = plt.subplot(num_partitions, 2, 2*k+1)
-        plotHierarchyCovariance(k, data_cov, min_cov, max_cov, 'Data covariance')
-        ax = plt.subplot(num_partitions, 2, 2*k+2)
-        cax = plotHierarchyCovariance(k, model_cov, min_cov, max_cov, 'Model covariance')
-        fig.colorbar(cax)
-    plt.tight_layout()
+	fig = plt.figure()
+	num_partitions = len(depth_to_measure_frame)
+	for k in depth_to_measure_frame.keys():
+		data_corr = depth_to_measure_frame[k].corr().values
+		model_corr = depth_to_model_measurement[k].corr().values
+		min_corr = np.min([data_corr.min(), model_corr.min()])
+		max_corr = np.max([data_corr.max(), model_corr.max()])
+		ax = plt.subplot(num_partitions, 2, 2*k+1)
+		plotHierarchyCovariance(ax, k, data_corr, min_corr, max_corr, 'Data correlation')
+		ax = plt.subplot(num_partitions, 2, 2*k+2)
+		im = plotHierarchyCovariance(ax, k, model_corr, min_corr, max_corr, 'Model correlation')
+		fig.subplots_adjust(right=0.8)
+		cbar_ax = fig.add_axes([0.85, ax.get_position().y0, 0.05, ax.get_position().y1])
+		fig.colorbar(cax=cbar_ax)
+	plt.tight_layout()
 
 print(dt.datetime.now().isoformat() + ' INFO: ' + 'Loading measurements...')
 country_measurement_frame, province_measurement_frame, region_measurement_frame, country_param_frame, province_param_frame, region_param_frame = loadMeasurementsAndTruth(csv_dir, args.csv_file_prefix)
