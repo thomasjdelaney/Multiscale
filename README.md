@@ -39,4 +39,3 @@ Run:
 ###### TODO:
 * Save and load tree using YAML.
 * calculate marginal likelihood of more than one hierarchy of partitions
-* use a true covariance matrix with some correlation, fit the model, sample from the model, see if the covariances are captured

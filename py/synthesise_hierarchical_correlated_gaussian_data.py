@@ -4,7 +4,6 @@ Useful line for editing:
     execfile(os.path.join(os.environ['HOME'], '.pystartup'))
 """
 import os
-execfile(os.path.join(os.environ['HOME'], '.pystartup'))
 import argparse
 import pandas as pd
 import random as rd
