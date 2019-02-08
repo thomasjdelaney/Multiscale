@@ -13,6 +13,7 @@ from numpy.random import multivariate_normal, seed
 from sklearn.datasets import make_spd_matrix # for generating random covariance matrices
 
 parser = argparse.ArgumentParser(description='Create random continuous data with some covariance between region measurements.')
+parser.add_argument('-n', '--num_samples', help='Number of samples to create.', type=int, default=1000)
 parser.add_argument('-t', '--covariance_type', help='The type of covariance to use.', default='intraprovincial', choices=['intraprovincial', 'random', 'extraprovincial', 'manual'])
 parser.add_argument('-c', '--correlation_values', help='Correlation values to use in manual covariance mode. [intraprovincial, intracountry, extracountry]', nargs=3, type=float, default=[0.5, 0.3, 0.1])
 parser.add_argument('-s', '--save_prefix', help='The prefix to use when saving csv files.', default='corr_')
@@ -80,7 +81,7 @@ else:
     covariance_matrix = getRandomCorrelationMatrix()
 
 region_param_frame = getRegionParamFrame(regional_means, covariance_matrix)
-samples = multivariate_normal(regional_means, covariance_matrix, 1000)
+samples = multivariate_normal(regional_means, covariance_matrix, args.num_samples)
 region_measurement_frame = pd.DataFrame(samples, columns=region_param_frame.columns)
 
 province_param_frame = pd.DataFrame()

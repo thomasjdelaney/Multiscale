@@ -34,8 +34,9 @@ The csv files will be saved in the 'csv' directory and the 'save_prefix' will be
 #### Example with plots
 
 Run:
-* python py/synthesise_hierarchical_correlated_gaussian_data.py --covariance_type manual --correlation_values 0.5 0.3 0.1 --save_prefix man_; python -i py/recover_synthetic_gaussian_parameters.py --plot_mean_accuracy --plot_correlation --plot_variance_accuracy --csv_file_prefix man_
+* python py/synthesise_hierarchical_correlated_gaussian_data.py --covariance_type manual --correlation_values 0.5 0.3 0.1 --save_prefix man_ --num_samples 1000; python -i py/recover_synthetic_gaussian_parameters.py --plot_mean_accuracy --plot_correlation --plot_variance_accuracy --csv_file_prefix man_ --num_samples 1000
 
 ###### TODO:
 * Save and load tree using YAML.
 * calculate marginal likelihood of more than one hierarchy of partitions
+* A lot of variance is pushed into the 'leftover' regions. Why is that?

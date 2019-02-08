@@ -14,9 +14,9 @@ def plotTrueMeansVsEstimatedMeans(parent_nodes, colour_dict, child_param_frame, 
     for parent_node in parent_nodes:
         scatterWithColour(parent_node, colour_dict, child_param_frame, child_param_estimated, param_name, estimated_name)
     plt.xlabel(xlabel, fontsize='large'); plt.ylabel(ylabel, fontsize='large')
-    upper_x_lim, upper_y_lim = np.ceil(plt.xlim()[1]), np.ceil(plt.ylim()[1])
-    plt.plot([0,upper_x_lim], [0,upper_y_lim], color='black', linestyle='--', alpha=0.3)
-    plt.xlim(0,upper_x_lim); plt.ylim(0,upper_y_lim)
+    larger_limit = np.max([np.ceil(plt.xlim()[1]), np.ceil(plt.ylim()[1])])
+    plt.plot([0,larger_limit], [0,larger_limit], color='black', linestyle='--', alpha=0.3)
+    plt.xlim(0,larger_limit); plt.ylim(0,larger_limit)
     plt.title(title, fontsize='large')
 
 def scatterWithColour(parent_node, colour_dict, child_param_frame, child_param_estimated, param_name, estimated_name):

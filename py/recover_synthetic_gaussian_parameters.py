@@ -27,6 +27,7 @@ parser.add_argument('-c', '--correlation_plot_filename', help='Where to save the
 parser.add_argument('-g', '--plot_variance_accuracy', help='Flag to plot the sample variances vs model variances.', action='store_true')
 parser.add_argument('-j', '--variance_accuracy_plot_filename', help='Where to save the variance accuracy plot. If not entered, plot will not be saved.', type=str, default='')
 parser.add_argument('-f', '--csv_file_prefix', help='Prefix to attach to csv file names.', type=str, default='')
+parser.add_argument('-n', '--num_samples', help='Num samples to take from model.', type=int, default=1000)
 parser.add_argument('-d', '--debug', help='Flag to enter debug mode.', action='store_true', default=False)
 args = parser.parse_args()
 
@@ -253,7 +254,7 @@ if args.save_mean_accuracy:
     print(dt.datetime.now().isoformat() + ' INFO: ' + 'Saving mean estimation accuracy...')
     saveMeanAccuracyToCsv(args.identity_scaling_value, mean_msd)
 print(dt.datetime.now().isoformat() + ' INFO: ' + 'Sampling from model and plotting pairwise correlations...')
-depth_to_model_measurement = sampleFromModel([country_0, country_1], depth_to_estimated_frame)
+depth_to_model_measurement = sampleFromModel([country_0, country_1], depth_to_estimated_frame, num_samples=args.num_samples)
 var_msd = np.power(depth_to_measure_frame[2].var() - depth_to_model_measurement[2].var(), 2).mean()
 print(dt.datetime.now().isoformat() + ' INFO: ' + 'Mean squared difference between sample variances and model variances: ' + str(var_msd))
 if args.plot_correlation:
