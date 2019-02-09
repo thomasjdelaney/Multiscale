@@ -14,7 +14,7 @@ from sklearn.datasets import make_spd_matrix # for generating random covariance 
 
 parser = argparse.ArgumentParser(description='Create random continuous data with some covariance between region measurements.')
 parser.add_argument('-n', '--num_samples', help='Number of samples to create.', type=int, default=1000)
-parser.add_argument('-t', '--covariance_type', help='The type of covariance to use.', default='intraprovincial', choices=['intraprovincial', 'random', 'extraprovincial', 'manual'])
+parser.add_argument('-t', '--covariance_type', help='The type of covariance to use.', default='intraprovincial', choices=['intraprovincial', 'random', 'extraprovincial', 'manual', 'independent'])
 parser.add_argument('-c', '--correlation_values', help='Correlation values to use in manual covariance mode. [intraprovincial, intracountry, extracountry]', nargs=3, type=float, default=[0.5, 0.3, 0.1])
 parser.add_argument('-s', '--save_prefix', help='The prefix to use when saving csv files.', default='corr_')
 parser.add_argument('-r', '--random_states', help='The random states to use when making covariance matrices.', nargs=2, type=int, default=[1798, 1916])
@@ -28,7 +28,7 @@ proj_dir = os.path.join(os.environ['HOME'], 'Multiscale')
 csv_dir = os.path.join(proj_dir, 'csv', 'gaussian')
 
 def getRegionalMeans():
-    return [rd.uniform(2,15) for i in range(0,24)]
+    return np.array([rd.uniform(2,20) for i in range(0,24)])
 
 def getIntraprovinceCorrelationCovarianceMatrix():
     covariance_0 = make_spd_matrix(3, random_state=args.random_states[0])
@@ -57,6 +57,11 @@ def getManualCorrelationMatrix(correlation_values):
         [extracountry_corr*np.ones([12,12]), manual_correlation_matrix_country_block[::-1, ::-1]]])
     return manual_correlation_matrix
 
+def getIndependentCorrelationMatrix():
+    regional_means = getRegionalMeans()
+    regional_vars = np.array([rd.uniform(0,1)*regional_mean for regional_mean in regional_means])
+    return np.diag(regional_vars)
+
 def getRegionParamFrame(regional_means, covariance_matrix):
     region_param_frame = pd.DataFrame()
     for i in range(0,24):
@@ -76,6 +81,8 @@ elif args.covariance_type == 'extraprovincial':
     covariance_matrix = getRandomCorrelationMatrix() # TODO
 elif args.covariance_type == 'manual':
     covariance_matrix = getManualCorrelationMatrix(args.correlation_values)
+elif args.covariance_type == 'independent':
+    covariance_matrix = getIndependentCorrelationMatrix()
 else:
     print(dt.datetime.now().isoformat() + ' ERROR: ' + 'covariance type not recognised!')
     covariance_matrix = getRandomCorrelationMatrix()

@@ -31,9 +31,12 @@ It is possible to create synthetic hierarchical data with correlations chosen by
 * python py/synthesise_hierarchical_correlated_gaussian_data.py --covariance_type manual --correlation_values 0.5 0.3 0.1 --save_prefix man_
 The csv files will be saved in the 'csv' directory and the 'save_prefix' will be fixed to the beginning of the files' names. The three 'correlation_values' correspond to intraprovincial correlation, intracountry (but extraprovincial) correlation, and extracountry correlation.
 
-#### Example with plots
+#### Examples with plots
 
-Run:
+For data from independent regions, run:
+* python py/synthesise_hierarchical_correlated_gaussian_data.py --covariance_type independent --save_prefix indy_ --num_samples 1000; python -i py/recover_synthetic_gaussian_parameters.py --plot_mean_accuracy --plot_correlation --plot_variance_accuracy --csv_file_prefix indy_ --num_samples 1000
+
+For data with manually controlled correlations, run:
 * python py/synthesise_hierarchical_correlated_gaussian_data.py --covariance_type manual --correlation_values 0.5 0.3 0.1 --save_prefix man_ --num_samples 1000; python -i py/recover_synthetic_gaussian_parameters.py --plot_mean_accuracy --plot_correlation --plot_variance_accuracy --csv_file_prefix man_ --num_samples 1000
 
 ###### TODO:
