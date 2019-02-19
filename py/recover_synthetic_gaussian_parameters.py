@@ -2,7 +2,7 @@
 Recover the parameters used to create the hierarchical data by calculating the multiscale parameters,
 and inference.
 Useful line for editing:
-    execfile(os.path.join(os.environ['HOME'], '.pystartup'))
+    exec(open(os.path.join(os.environ['HOME'], '.pystartup').read())
 """
 import os
 import sys, argparse, csv
@@ -40,7 +40,7 @@ image_dir = os.path.join(proj_dir, 'images', 'gaussian')
 results_csv_dir = os.path.join(proj_dir, 'csv', 'results')
 
 # loading hierarchical tree structure and province colours
-execfile(os.path.join(py_dir, 'tree_and_colours.py'))
+exec(open(os.path.join(py_dir, 'tree_and_colours.py')).read())
 
 # loading shared plotting functions
 sys.path.append(py_dir)
@@ -141,7 +141,7 @@ def sampleFromModelByNode(node, depth_to_model_measurement, depth_to_estimated_f
 
 def sampleFromModel(country_nodes, depth_to_estimated_frame, num_samples=1000):
     depth_to_model_measurement = {}
-    for k, estimated_parameter_frame in depth_to_estimated_frame.iteritems():
+    for k, estimated_parameter_frame in depth_to_estimated_frame.items():
         depth_to_model_measurement[k] = pd.DataFrame(columns=estimated_parameter_frame.columns, dtype=float, index=range(num_samples))
     top_level_Omega = np.diag(depth_to_estimated_frame[0].loc['var'])
     top_level_samples = multivariate_normal(depth_to_estimated_frame[0].loc['hier_mean'], top_level_Omega, num_samples)
