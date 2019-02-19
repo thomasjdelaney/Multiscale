@@ -4,12 +4,12 @@ Python 3.7.2
 
 ###### Required Packages:
 
-1. pandas 0.23.4
+1. pandas 0.24.1
 2. random
-3. numpy 1.15.2
-4. anytree 2.4.3
-5. scipy 1.1.0
-6. sklearn 0.20.0
+3. numpy 1.16.1
+4. anytree 2.6.0
+5. scipy 1.2.1
+6. sklearn 0.20.2
 
 #### Recovering parameters via hierarchical model
 
