@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime as dt
-from scipy.stats import multivariate_normal, norm
+import scipy.stats as ss
 from sklearn.datasets import make_spd_matrix # for generating random covariance matrices
 from decimal import Decimal # for printing numbers in scientific notation
 from numpy.random import multivariate_normal
@@ -241,6 +241,23 @@ def plotHierarchyPairwiseCorrelation(depth_to_measure_frame, depth_to_model_meas
         plt.show(block=False)
     return save_name
 
+def getModelLikelihood(country_nodes, depth_to_estimated_frame, depth_to_measure_frame):
+    num_measures = depth_to_measure_frame[0].shape[0]
+    depth_to_likelihoods = {}
+    for k, estimated_parameter_frame in depth_to_estimated_frame.items():
+        depth_to_likelihoods[k] = pd.DataFrame(columns=estimated_parameter_frame.columns, dtype=float, index=range(num_measures))
+    for top_level_node in country_nodes:
+        node_and_family = (top_level_node,) + top_level_node.children
+        for node in node_and_family:
+            child_names, node_nu, node_Omega = getNodeOmega(node, depth_to_estimated_frame[node.depth], depth_to_estimated_frame[node.depth+1])
+            child_depth = node.depth + 1
+            child_measurements = depth_to_measure_frame[child_depth][child_names].values
+            parent_measurements = depth_to_measure_frame[node.depth][node.name].values
+            for i, measures in enumerate(zip(child_measurements, parent_measurements)):
+                measure_dist = ss.multivariate_normal(node_nu*measures[1], node_Omega)
+                depth_to_likelihoods[node.depth].loc[i][node.name] = measure_dist.logpdf(measures[0])
+    return depth_to_likelihoods
+
 print(dt.datetime.now().isoformat() + ' INFO: ' + 'Loading measurements...')
 country_measurement_frame, province_measurement_frame, region_measurement_frame, country_param_frame, province_param_frame, region_param_frame = loadMeasurementsAndTruth(csv_dir, args.csv_file_prefix)
 depth_to_measure_frame = {0:country_measurement_frame, 1:province_measurement_frame, 2:region_measurement_frame}
@@ -280,3 +297,4 @@ if args.plot_variance_accuracy:
 if args.save_metrics:
     print(dt.datetime.now().isoformat() + ' INFO: ' + 'Saving mean estimation accuracy...')
     saveMetricsToCsv(args.identity_scaling_value, depth_to_measure_frame[0].shape[0], est_hier_msd, est_true_msd, hier_true_msd, var_msd)
+depth_to_likelihoods = getModelLikelihood([country_0, country_1], depth_to_estimated_frame, depth_to_measure_frame)
