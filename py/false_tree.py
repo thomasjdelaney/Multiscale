@@ -1,8 +1,7 @@
 """
-For building the hierarchical structure in a tree, and assigning a colour to each province.
+For building the wrong hierarchical structure in a tree.
 """
 import anytree as at
-import matplotlib.cm as cm
 
 # building trees TODO: move this to a separate script and save down using YAML
 country_0 = at.Node('country_0')
@@ -16,7 +15,7 @@ province_5 = at.Node('province_5', parent=country_1)
 region_0 = at.Node('region_0', parent=province_0)
 region_1 = at.Node('region_1', parent=province_0)
 region_2 = at.Node('region_2', parent=province_0)
-region_3 = at.Node('region_3', parent=province_1)
+region_3 = at.Node('region_3', parent=province_0) # HERE IS THE CHANGE
 region_4 = at.Node('region_4', parent=province_1)
 region_5 = at.Node('region_5', parent=province_1)
 region_6 = at.Node('region_6', parent=province_1)
@@ -37,17 +36,3 @@ region_20 = at.Node('region_20', parent=province_4)
 region_21 = at.Node('region_21', parent=province_5)
 region_22 = at.Node('region_22', parent=province_5)
 region_23 = at.Node('region_23', parent=province_5)
-
-province_to_colour = {}
-colours = cm.gist_rainbow(np.linspace(0, 1, 6))
-province_to_colour[province_0] = colours[0]
-province_to_colour[province_1] = colours[1]
-province_to_colour[province_2] = colours[2]
-province_to_colour[province_3] = colours[3]
-province_to_colour[province_4] = colours[4]
-province_to_colour[province_5] = colours[5]
-
-country_to_colour = {}
-colours = cm.rainbow(np.linspace(0, 1, 2))
-country_to_colour[country_0] = colours[0]
-country_to_colour[country_1] = colours[1]

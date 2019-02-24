@@ -28,6 +28,8 @@ parser.add_argument('-g', '--plot_variance_accuracy', help='Flag to plot the sam
 parser.add_argument('-j', '--variance_accuracy_plot_filename', help='Where to save the variance accuracy plot. If not entered, plot will not be saved.', type=str, default='')
 parser.add_argument('-f', '--csv_file_prefix', help='Prefix to attach to csv file names.', type=str, default='')
 parser.add_argument('-n', '--num_samples', help='Num samples to take from model.', type=int, default=1000)
+parser.add_argument('-m', '--marginal_likelihood_filename', help='File name for saving the marginal likelihood. If left empty, the likelihood will not be saved.', type=str, default='')
+parser.add_argument('-t', '--tree_file', help='File from which to load the anytree tree structure.', type=str, default='true_tree.py')
 parser.add_argument('-d', '--debug', help='Flag to enter debug mode.', action='store_true', default=False)
 args = parser.parse_args()
 
@@ -38,9 +40,11 @@ py_dir = os.path.join(proj_dir, 'py')
 csv_dir = os.path.join(proj_dir, 'csv', 'gaussian')
 image_dir = os.path.join(proj_dir, 'images', 'gaussian')
 results_csv_dir = os.path.join(proj_dir, 'csv', 'results')
+npy_dir = os.path.join(proj_dir, 'npy')
 
 # loading hierarchical tree structure and province colours
-exec(open(os.path.join(py_dir, 'tree_and_colours.py')).read())
+exec(open(os.path.join(py_dir, args.tree_file)).read())
+exec(open(os.path.join(py_dir, 'colour_dictionaries.py')).read())
 
 # loading shared plotting functions
 sys.path.append(py_dir)
@@ -152,6 +156,25 @@ def sampleFromModel(country_nodes, depth_to_estimated_frame, num_samples=1000):
             depth_to_model_measurement = sampleFromModelByNode(node, depth_to_model_measurement, depth_to_estimated_frame)
     return depth_to_model_measurement
 
+def getModelLikelihood(country_nodes, depth_to_estimated_frame, depth_to_measure_frame):
+    num_measures = depth_to_measure_frame[0].shape[0]
+    depth_to_likelihoods = {}
+    for k, estimated_parameter_frame in depth_to_estimated_frame.items():
+        depth_to_likelihoods[k] = pd.DataFrame(columns=estimated_parameter_frame.columns, dtype=float, index=range(num_measures))
+    depth_to_likelihoods.popitem() # remove key for coarsest partition, not required.
+    for top_level_node in country_nodes:
+        node_and_family = (top_level_node,) + top_level_node.children
+        for node in node_and_family:
+            child_names, node_nu, node_Omega = getNodeOmega(node, depth_to_estimated_frame[node.depth], depth_to_estimated_frame[node.depth+1])
+            node_phi = getPriorCovarianceMatrix(args.use_random_matrix, len(child_names), args.identity_scaling_value)
+            child_depth = node.depth + 1
+            child_measurements = depth_to_measure_frame[child_depth][child_names].values
+            parent_measurements = depth_to_measure_frame[node.depth][node.name].values
+            for i, measures in enumerate(zip(child_measurements, parent_measurements)):
+                measure_dist = ss.multivariate_normal(node_nu*measures[1], node_Omega + node_phi)
+                depth_to_likelihoods[node.depth].loc[i][node.name] = measure_dist.logpdf(measures[0])
+    return depth_to_likelihoods
+
 def plotRegionalDistnWithEstParam(region_nodes, param_frame, param_estimated, colour_dict, num_rows=6, num_columns=4):
     num_regions = len(region_nodes)
     real_fig = plt.figure(0)
@@ -241,22 +264,11 @@ def plotHierarchyPairwiseCorrelation(depth_to_measure_frame, depth_to_model_meas
         plt.show(block=False)
     return save_name
 
-def getModelLikelihood(country_nodes, depth_to_estimated_frame, depth_to_measure_frame):
-    num_measures = depth_to_measure_frame[0].shape[0]
-    depth_to_likelihoods = {}
-    for k, estimated_parameter_frame in depth_to_estimated_frame.items():
-        depth_to_likelihoods[k] = pd.DataFrame(columns=estimated_parameter_frame.columns, dtype=float, index=range(num_measures))
-    for top_level_node in country_nodes:
-        node_and_family = (top_level_node,) + top_level_node.children
-        for node in node_and_family:
-            child_names, node_nu, node_Omega = getNodeOmega(node, depth_to_estimated_frame[node.depth], depth_to_estimated_frame[node.depth+1])
-            child_depth = node.depth + 1
-            child_measurements = depth_to_measure_frame[child_depth][child_names].values
-            parent_measurements = depth_to_measure_frame[node.depth][node.name].values
-            for i, measures in enumerate(zip(child_measurements, parent_measurements)):
-                measure_dist = ss.multivariate_normal(node_nu*measures[1], node_Omega)
-                depth_to_likelihoods[node.depth].loc[i][node.name] = measure_dist.logpdf(measures[0])
-    return depth_to_likelihoods
+def saveModelLikelihood(depth_to_likelihoods, filename):
+    marginal_likelihood_by_measure = np.array([v.sum(axis=1) for k,v in depth_to_likelihoods.items()]).sum(axis=0)
+    file_path = os.path.join(npy_dir, 'marginal_likelihoods', filename)
+    np.save(file_path, marginal_likelihood_by_measure)
+    return file_path
 
 print(dt.datetime.now().isoformat() + ' INFO: ' + 'Loading measurements...')
 country_measurement_frame, province_measurement_frame, region_measurement_frame, country_param_frame, province_param_frame, region_param_frame = loadMeasurementsAndTruth(csv_dir, args.csv_file_prefix)
@@ -297,4 +309,10 @@ if args.plot_variance_accuracy:
 if args.save_metrics:
     print(dt.datetime.now().isoformat() + ' INFO: ' + 'Saving mean estimation accuracy...')
     saveMetricsToCsv(args.identity_scaling_value, depth_to_measure_frame[0].shape[0], est_hier_msd, est_true_msd, hier_true_msd, var_msd)
+print(dt.datetime.now().isoformat() + ' INFO: ' + 'Calculating marginal likelihood...')
 depth_to_likelihoods = getModelLikelihood([country_0, country_1], depth_to_estimated_frame, depth_to_measure_frame)
+marginal_likelihood = np.array([v.values.sum() for k,v in depth_to_likelihoods.items()]).sum()
+print(dt.datetime.now().isoformat() + ' INFO: ' + 'Marginal likelihood = ' + str(marginal_likelihood))
+if args.marginal_likelihood_filename != '':
+    file_path = saveModelLikelihood(depth_to_likelihoods, args.marginal_likelihood_filename)
+    print(dt.datetime.now().isoformat() + ' INFO: ' + 'Model likelihood saved to ' + file_path)
