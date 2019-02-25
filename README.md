@@ -56,6 +56,12 @@ For data with manually controlled correlations, run:
 python py/synthesise_hierarchical_correlated_gaussian_data.py --covariance_type manual --correlation_values 0.5 0.3 0.1 --save_prefix man_ --num_samples 1000
 python -i py/recover_synthetic_gaussian_parameters.py --plot_mean_accuracy --plot_correlation --plot_variance_accuracy --csv_file_prefix man_ --num_samples 1000
 ```
+#### Using different trees
+
+Examples of trees can be found in ```py/true_tree.py``` and ```py/false_tree.py```. At the moment, every valid tree must have 2 countries, 6 provinces, and 24 regions. The tree used to create synthetic data is ```true_tree.py```, the 'false' tree can be used to measure differences created by using an incorrect tree. To make use of a given tree, use the ```--tree_file``` command line argument for the ```recover_synthetic_gaussian_parameters.py``` script.
+
+
+
 ###### TODO:
 * Save and load tree using YAML.
 * calculate marginal likelihood of more than one hierarchy of partitions
